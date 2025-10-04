@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Forecast Voyager | NASA-Inspired Weather System</title>
+    <link rel="icon" type="image/x-icon" href="https://static.photos/technology/200x200/42">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.globe.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'nasa': ['"Orbitron"', 'sans-serif'],
+                        'mono': ['"Space Mono"', 'monospace']
+                    },
+                    colors: {
+                        cosmic: {
+                            dark: '#0a0e17',
+                            primary: '#0066ff',
+                            secondary: '#00c8ff',
+                            accent: '#ff3366',
+                            panel: '#1a2138',
+                            text: '#e0f2fe'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Space+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Space Mono', monospace;
+            background-color: #0a0e17;
+            color: #e0f2fe;
+            overflow-x: hidden;
+        }
+        
+        .vanta-canvas {
+            position: fixed !important;
+            opacity: 0.15;
+            z-index: -1;
+        }
+        
+        .nasa-panel {
+            background-color: rgba(26, 33, 56, 0.8);
+            border: 1px solid rgba(0, 200, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .nasa-button {
+            background: linear-gradient(135deg, #0066ff 0%, #00c8ff 100%);
+            border: none;
+            color: white;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .nasa-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 200, 255, 0.4);
+        }
+        
+        .event-badge {
+            border-radius: 16px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        
+        .sunny {
+            background-color: rgba(255, 214, 10, 0.2);
+            border: 1px solid rgba(255, 214, 10, 0.5);
+            color: #ffd60a;
+        }
+        
+        .rainy {
+            background-color: rgba(0, 119, 182, 0.2);
+            border: 1px solid rgba(0, 119, 182, 0.5);
+            color: #0077b6;
+        }
+        
+        .cold {
+            background-color: rgba(202, 240, 248, 0.2);
+            border: 1px solid rgba(202, 240, 248, 0.5);
+            color: #caf0f8;
+        }
+        
+        .windy {
+            background-color: rgba(72, 202, 228, 0.2);
+            border: 1px solid rgba(72, 202, 228, 0.5);
+            color: #48cae4;
+        }
+        
+        .sensitive {
+            background-color: rgba(239, 71, 111, 0.2);
+            border: 1px solid rgba(239, 71, 111, 0.5);
+            color: #ef476f;
+        }
+        
+        #map {
+            height: 400px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 200, 255, 0.3);
+        }
+        
+        .leaflet-control-attribution {
+            background-color: transparent !important;
+            color: white !important;
+        }
+        
+        .leaflet-control-attribution a {
+            color: #00c8ff !important;
+        }
+        
+        .weather-card {
+            transition: all 0.3s ease;
+        }
+        
+        .weather-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .temp-gauge {
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #00c8ff 0%, #ff3366 100%);
+        }
+        
+        .theme-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+        }
+        
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .theme-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #1a2138;
+            transition: .4s;
+            border-radius: 30px;
+            border: 1px solid #00c8ff;
+        }
+        
+        .theme-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .theme-slider {
+            background-color: #00c8ff;
+        }
+        
+        input:checked + .theme-slider:before {
+            transform: translateX(28px);
+        }
+        
+        .hud-element {
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            background-color: rgba(10, 14, 23, 0.7);
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-cosmic-dark text-cosmic-text">
+    <div id="vanta-bg"></div>
+    
+    <header class="py-6 px-4 sm:px-8 nasa-panel">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <img src="https://static.photos/technology/200x200/42" alt="Logo" class="w-12 h-12 rounded-full">
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-bold font-nasa">SureWeather</h1>
+                    <p class="text-xs sm:text-sm opacity-80">Weather Forecast System</p>
+</div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <label class="theme-switch">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="theme-slider"></span>
+                </label>
+                <button class="nasa-button px-4 py-2 rounded-md text-sm">
+                    <i data-feather="log-in" class="mr-2"></i>Sign In
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 sm:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Weather Overview Panel -->
+            <div class="lg:col-span-2 nasa-panel p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl sm:text-2xl font-bold font-nasa">EARTH WEATHER STATION</h2>
+                    <div class="flex items-center space-x-2">
+                        <i data-feather="map-pin" class="text-cosmic-secondary"></i>
+                        <span id="location" class="text-sm sm:text-base">Detecting your location...</span>
+                    </div>
+                </div>
+                
+                <!-- Map Container -->
+                <div id="map" class="mb-6"></div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div class="hud-element">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-cosmic-secondary">CURRENT CONDITIONS</h3>
+                            <div class="flex items-center">
+                                <i data-feather="sun" id="current-icon" class="text-yellow-400 mr-2"></i>
+                                <span id="current-temp" class="font-bold text-xl">--°C</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Feels Like: <span id="feels-like" class="font-bold">--°C</span></span>
+                            <span>Humidity: <span id="humidity" class="font-bold">--%</span></span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Wind: <span id="wind" class="font-bold">-- km/h</span></span>
+                            <span>Pressure: <span id="pressure" class="font-bold">-- hPa</span></span>
+                        </div>
+                    </div>
+                    
+                    <div class="hud-element">
+                        <h3 class="font-bold text-cosmic-secondary mb-2">SEASONAL OUTLOOK</h3>
+                        <div class="flex items-center mb-2">
+                            <div class="w-full bg-gray-700 rounded-full h-2.5 mr-2">
+                                <div id="temp-range" class="temp-gauge h-2.5 rounded-full" style="width: 50%"></div>
+                            </div>
+                            <span id="season" class="text-xs">Calculating...</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span>High</span>
+                                    <span id="season-high" class="font-bold">--°C</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-1">
+                                    <div class="bg-red-500 h-1 rounded-full" style="width: 70%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span>Low</span>
+                                    <span id="season-low" class="font-bold">--°C</span>
+                                </div>
+                                <div class="w-full bg-gray-700 rounded-full h-1">
+                                    <div class="bg-blue-500 h-1 rounded-full" style="width: 30%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hourly Forecast -->
+                <h3 class="font-bold text-lg mb-4">HOURLY FORECAST</h3>
+                <div class="flex overflow-x-auto pb-2 space-x-4">
+                    <!-- Hourly items will be added here by JS -->
+                    <div class="text-center px-4 py-2 nasa-panel min-w-[80px]">
+                        <div class="text-sm opacity-80">Now</div>
+                        <i data-feather="sun" class="w-6 h-6 mx-auto my-2 text-yellow-400"></i>
+                        <div class="font-bold">--°C</div>
+                    </div>
+                    <!-- More hourly items -->
+                </div>
+            </div>
+            
+            <!-- Right Sidebar -->
+            <div class="space-y-6">
+                <!-- Events Panel -->
+                <div class="nasa-panel p-6">
+                    <h2 class="text-xl font-bold font-nasa mb-4">EVENT RECOMMENDATIONS</h2>
+                    <div class="space-y-4">
+                        <div class="weather-card nasa-panel p-4 cursor-pointer hover:border-cosmic-secondary">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="font-bold">Outdoor Concert</h3>
+                                <span class="event-badge sunny">Sunny (85%)</span>
+                            </div>
+                            <p class="text-sm opacity-80 mb-2">Perfect weather for live music under the stars</p>
+                            <div class="flex items-center text-xs">
+                                <i data-feather="calendar" class="w-4 h-4 mr-1"></i>
+                                <span>Today 7PM • Central Park</span>
+                            </div>
+                        </div>
+                        
+                        <div class="weather-card nasa-panel p-4 cursor-pointer hover:border-cosmic-secondary">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="font-bold">Museum Exhibit</h3>
+                                <span class="event-badge rainy">Rainy (92%)</span>
+                            </div>
+                            <p class="text-sm opacity-80 mb-2">Great indoor activity for rainy days</p>
+                            <div class="flex items-center text-xs">
+                                <i data-feather="calendar" class="w-4 h-4 mr-1"></i>
+                                <span>Tomorrow 10AM • Art Gallery</span>
+                            </div>
+                        </div>
+                        
+                        <div class="weather-card nasa-panel p-4 cursor-pointer hover:border-cosmic-secondary">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="font-bold">Beach Day</h3>
+                                <span class="event-badge windy">Windy (65%)</span>
+                            </div>
+                            <p class="text-sm opacity-80 mb-2">Great for kite flying, bring a jacket</p>
+                            <div class="flex items-center text-xs">
+                                <i data-feather="calendar" class="w-4 h-4 mr-1"></i>
+                                <span>This Weekend • Seaside</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Clothing Recommendations -->
+                <div class="nasa-panel p-6">
+                    <h2 class="text-xl font-bold font-nasa mb-4">CLOTHING RECOMMENDATIONS</h2>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="flex items-center p-2 bg-cosmic-panel rounded">
+                            <i data-feather="sun" class="w-5 h-5 mr-2 text-yellow-400"></i>
+                            <span class="text-sm">Sunglasses</span>
+                        </div>
+                        <div class="flex items-center p-2 bg-cosmic-panel rounded">
+                            <i data-feather="umbrella" class="w-5 h-5 mr-2 text-blue-400"></i>
+                            <span class="text-sm">Rain Jacket</span>
+                        </div>
+                        <div class="flex items-center p-2 bg-cosmic-panel rounded">
+                            <i data-feather="wind" class="w-5 h-5 mr-2 text-gray-400"></i>
+                            <span class="text-sm">Scarf</span>
+                        </div>
+                        <div class="flex items-center p-2 bg-cosmic-panel rounded">
+                            <i data-feather="thermometer" class="w-5 h-5 mr-2 text-red-400"></i>
+                            <span class="text-sm">Light Layers</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 7-Day Forecast -->
+        <div class="nasa-panel p-6 mt-8">
+            <h2 class="text-xl sm:text-2xl font-bold font-nasa mb-6">7-DAY SPACE WEATHER FORECAST</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-4">
+                <!-- Forecast cards will be added here by JS -->
+                <div class="weather-card nasa-panel p-4 text-center">
+                    <div class="font-bold mb-2">Today</div>
+                    <i data-feather="sun" class="w-10 h-10 mx-auto my-3 text-yellow-400"></i>
+                    <div class="font-bold text-lg mb-1">--°C</div>
+                    <div class="text-xs opacity-80">--°C / --°C</div>
+                </div>
+                <!-- More forecast days -->
+            </div>
+        </div>
+    </main>
+    
+    <footer class="py-6 px-4 sm:px-8 nasa-panel mt-8">
+        <div class="container mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <h2 class="font-nasa font-bold text-lg">SureWeather</h2>
+                    <p class="text-sm opacity-80">Weather Forecast System</p>
+</div>
+                <div class="flex space-x-6">
+                    <a href="#" class="hover:text-cosmic-secondary">
+                        <i data-feather="github"></i>
+                    </a>
+                    <a href="#" class="hover:text-cosmic-secondary">
+                        <i data-feather="twitter"></i>
+                    </a>
+                    <a href="#" class="hover:text-cosmic-secondary">
+                        <i data-feather="globe"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-cosmic-secondary/20 mt-6 pt-6 text-sm opacity-70">
+                <p>This application uses OpenWeather API for weather predictions. Not for operational use.</p>
+<p class="mt-2">Created for educational purposes only.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Vanta.js background
+        VANTA.GLOBE({
+            el: "#vanta-bg",
+            mouseControls: true,
+            touchControls: true,
+            gyroControls: false,
+            minHeight: 200.00,
+            minWidth: 200.00,
+            scale: 1.00,
+            scaleMobile: 1.00,
+            color: 0x0066ff,
+            backgroundColor: 0x0a0e17,
+            size: 0.8
+        });
+        
+        // Initialize Leaflet map
+        function initMap() {
+            const map = L.map('map').setView([51.505, -0.09], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                className: 'map-tiles'
+            }).addTo(map);
+            
+            // Add click event to update weather
+            map.on('click', function(e) {
+                updateWeatherForLocation(e.latlng.lat, e.latlng.lng);
+            });
+            
+            // Try to get user's location
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    map.setView([position.coords.latitude, position.coords.longitude], 13);
+                    updateWeatherForLocation(position.coords.latitude, position.coords.longitude);
+                }, function(error) {
+                    console.error("Error getting location:", error);
+                    // Default to New York if location access is denied
+                    updateWeatherForLocation(40.7128, -74.0060);
+                });
+            } else {
+                // Browser doesn't support Geolocation
+                updateWeatherForLocation(40.7128, -74.0060);
+            }
+        }
+        
+        // Simulated weather data fetch
+        function updateWeatherForLocation(lat, lng) {
+            // In a real app, you would fetch from OpenWeather API here
+            console.log(`Fetching weather for lat: ${lat}, lng: ${lng}`);
+            
+            // Simulated response
+            const locationName = `${lat.toFixed(2)}°N, ${lng.toFixed(2)}°W`;
+            document.getElementById('location').textContent = locationName;
+            
+            // Simulate API delay
+            setTimeout(() => {
+                document.getElementById('current-temp').textContent = `${Math.round(Math.random() * 15 + 10)}°C`;
+                document.getElementById('feels-like').textContent = `${Math.round(Math.random() * 15 + 8)}°C`;
+                document.getElementById('humidity').textContent = `${Math.round(Math.random() * 40 + 50)}%`;
+                document.getElementById('wind').textContent = `${Math.round(Math.random() * 30 + 5)} km/h`;
+                document.getElementById('pressure').textContent = `${Math.round(Math.random() * 20 + 1000)} hPa`;
+                
+                // Update seasonal outlook
+                document.getElementById('season').textContent = "Seasonal Average";
+                document.getElementById('season-high').textContent = `${Math.round(Math.random() * 10 + 20)}°C`;
+                document.getElementById('season-low').textContent = `${Math.round(Math.random() * 10 + 5)}°C`;
+                
+                // Randomize the temp range indicator
+                document.getElementById('temp-range').style.width = `${Math.round(Math.random() * 40 + 40)}%`;
+                
+                // Update icons randomly
+                const icons = ['sun', 'cloud', 'cloud-rain', 'cloud-snow', 'wind'];
+                const currentIcon = icons[Math.floor(Math.random() * icons.length)];
+                feather.replace();
+            }, 800);
+        }
+        
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('change', function() {
+            if (this.checked) {
+                document.documentElement.classList.remove('dark');
+            } else {
+                document.documentElement.classList.add('dark');
+            }
+        });
+        
+        // Initialize everything when DOM loads
+        document.addEventListener('DOMContentLoaded', function() {
+            feather.replace();
+            initMap();
+            
+            // Generate some hourly forecast items
+            const hourlyContainer = document.querySelector('.flex.overflow-x-auto');
+            for (let i = 1; i < 24; i++) {
+                const hour = new Date();
+                hour.setHours(hour.getHours() + i);
+                
+                const hourDiv = document.createElement('div');
+                hourDiv.className = 'text-center px-4 py-2 nasa-panel min-w-[80px]';
+                hourDiv.innerHTML = `
+                    <div class="text-sm opacity-80">${hour.getHours()}h</div>
+                    <i data-feather="${i % 2 === 0 ? 'sun' : 'cloud'}" class="w-6 h-6 mx-auto my-2 ${i % 2 === 0 ? 'text-yellow-400' : 'text-gray-400'}"></i>
+                    <div class="font-bold">${Math.round(Math.random() * 5 + 15)}°C</div>
+                `;
+                hourlyContainer.appendChild(hourDiv);
+            }
+            
+            // Generate some 7-day forecast items
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const forecastContainer = document.querySelector('.grid.grid-cols-2.sm:grid-cols-3.md:grid-cols-7');
+            
+            // Remove the placeholder first
+            forecastContainer.innerHTML = '';
+            
+            for (let i = 0; i < 7; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() + i);
+                
+                const weatherTypes = ['sun', 'cloud', 'cloud-rain', 'cloud-snow', 'wind'];
+                const randomWeather = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+                let weatherColor = 'text-gray-400';
+                
+                if (randomWeather === 'sun') weatherColor = 'text-yellow-400';
+                if (randomWeather === 'cloud-rain') weatherColor = 'text-blue-400';
+                if (randomWeather === 'cloud-snow') weatherColor = 'text-gray-200';
+                if (randomWeather === 'wind') weatherColor = 'text-gray-300';
+                
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'weather-card nasa-panel p-4 text-center';
+                dayDiv.innerHTML = `
+                    <div class="font-bold mb-2">${i === 0 ? 'Today' : days[date.getDay()]}</div>
+                    <i data-feather="${randomWeather}" class="w-10 h-10 mx-auto my-3 ${weatherColor}"></i>
+                    <div class="font-bold text-lg mb-1">${Math.round(Math.random() * 8 + 12)}°C</div>
+                    <div class="text-xs opacity-80">${Math.round(Math.random() * 5 + 8)}°C / ${Math.round(Math.random() * 5 + 16)}°C</div>
+                `;
+                forecastContainer.appendChild(dayDiv);
+            }
+            
+            feather.replace();
+        });
+    </script>
+</body>
+</html>
