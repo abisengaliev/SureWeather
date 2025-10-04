@@ -224,5 +224,6 @@ For questions and support:
 
 ---
 
-**Built with ❤️ for NASA Space Apps Challenge 2024**
+**Built with ❤️ for NASA Space Apps Challenge 2025**
+
 
