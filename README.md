@@ -1,4 +1,4 @@
-# 🌍 SureWeather - NASA Space Apps Challenge 2024
+# 🌍 SureWeather - NASA Space Apps Challenge 2025
 
 SureWeather is an interactive weather forecasting and event suitability application that combines short-term forecasts, long-term climate probabilities, event recommendations, and clothing suggestions with an engaging world map interface.
 
@@ -225,3 +225,4 @@ For questions and support:
 ---
 
 **Built with ❤️ for NASA Space Apps Challenge 2024**
+
